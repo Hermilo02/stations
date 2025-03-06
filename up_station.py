@@ -13,7 +13,7 @@ conexion = pymysql.connect(
 cursor = conexion.cursor()
 
 # URL de la API
-url = "https://rt.ambientweather.net/v1/devices?applicationKey=7f3e3552a51d44bab4c7f2c5e0e0c1e544fab8e60df6478bb43135761f1cbfbf&apiKey=2b3bf76816104f14b5a26cdb5497b088b7de0421daa3434db01a74b8eb481f48"
+url = "https://rt.ambientweather.net/v1/devices?applicationKey=4ddfff7a5eab48a1ad792148df5aebfc5ef1b32954fc4a9a8dba87119959b1e3&apiKey=f48c0472e7264b0da49e4a133e297989cc2122ea46fb47df8cd87572c0d0a16a"
 
 # Obtener datos de la API
 response = requests.get(url)

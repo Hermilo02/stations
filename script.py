@@ -1,193 +1,189 @@
 import requests
-import pymysql
+import mysql.connector
+import pandas as pd
+import time
 from datetime import datetime, timedelta
-import pytz
 
 # Configuración de la base de datos
-config_db = {
-    'host': 'localhost',
-    'user': 'adminambientwet',
-    'password': 'admin',
-    'database': 'ambientweather',
-    'charset': 'utf8mb4',
-    'cursorclass': pymysql.cursors.DictCursor
+DB_CONFIG = {
+    "host": "localhost",
+    "user": "adminambientwet",
+    "password": "admin",
+    "database": "ambientweather"
 }
 
 # Configuración de la API
-api_key = "a5dd230a0dcc4fe38b7336b8e9cbef548c7a3a2505d747c1b5b8d115b4202ecf"
-application_key = "f2a84982ccaa4901b4eaa4f92b441ae305088f37558b4d108ceeb270613791c1"
+API_KEY = "f48c0472e7264b0da49e4a133e297989cc2122ea46fb47df8cd87572c0d0a16a"
+APP_KEY = "4ddfff7a5eab48a1ad792148df5aebfc5ef1b32954fc4a9a8dba87119959b1e3"
+BASE_URL = "https://rt.ambientweather.net/v1/devices/{}?apiKey={}&applicationKey={}&endDate={}&limit=288"
 
-# Leer las direcciones MAC desde el archivo txt
-def leer_mac_addresses():
-    with open("mac_address.txt", "r") as archivo:
-        mac_addresses = [linea.strip() for linea in archivo.readlines()]
-    return mac_addresses
+# Conectar a la base de datos
+def conectar_db():
+    return mysql.connector.connect(**DB_CONFIG)
 
-# Obtener el id_station a partir de la mac_address
-def obtener_id_station(mac_address):
-    conexion = pymysql.connect(**config_db)
-    try:
-        with conexion.cursor() as cursor:
-            cursor.execute("SELECT id_station FROM station WHERE macaddress = %s", (mac_address,))
-            resultado = cursor.fetchone()
-            if resultado:
-                return resultado['id_station']
+# Obtener las macaddress desde el archivo txt
+def obtener_macaddress():
+    with open("mac_address.txt", "r") as file:
+        macs = [line.strip() for line in file.readlines() if line.strip()]
+    return macs
+
+# Obtener id_station según macaddress
+def obtener_id_station(macaddress):
+    conn = conectar_db()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT id_station FROM station WHERE macaddress = %s", (macaddress,))
+    result = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return result["id_station"] if result else None
+
+# Crear tabla si no existe
+def crear_tabla_si_no_existe(anio, mes):
+    tabla = f"datos_{mes:02d}_{anio}"
+    conn = conectar_db()
+    cursor = conn.cursor()
+    query = f'''
+    CREATE TABLE IF NOT EXISTS {tabla} (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        id_station INT,
+        date DATETIME,
+        dateutc BIGINT UNSIGNED UNIQUE,
+        tempf DECIMAL(5,2),
+        humidity TINYINT UNSIGNED,
+        windspeedmph DECIMAL(4,2),
+        windgustmph DECIMAL(4,2),
+        maxdailygust DECIMAL(4,2),
+        winddir SMALLINT UNSIGNED,
+        winddir_avg10m SMALLINT UNSIGNED,
+        hourlyrainin DECIMAL(4,2),
+        eventrainin DECIMAL(4,2),
+        dailyrainin DECIMAL(4,2),
+        weeklyrainin DECIMAL(5,2),
+        monthlyrainin DECIMAL(5,2),
+        yearlyrainin DECIMAL(6,2),
+        totalrainin DECIMAL(6,2),
+        battout TINYINT,
+        tempinf DECIMAL(5,2),
+        humidityin TINYINT UNSIGNED,
+        baromrelin DECIMAL(5,2),
+        baromabsin DECIMAL(5,2),
+        feelsLike DECIMAL(5,2),
+        dewPoint DECIMAL(5,2),
+        feelsLikein DECIMAL(5,2),
+        dewPointin DECIMAL(5,2),
+        lastRain DATETIME,
+        FOREIGN KEY (id_station) REFERENCES station(id_station)
+    )'''
+    cursor.execute(query)
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return tabla
+
+def registro_existe(tabla, id_station, dateutc):
+    conn = conectar_db()
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT 1 FROM {tabla} WHERE id_station = %s AND dateutc = %s LIMIT 1", (id_station, dateutc))
+    existe = cursor.fetchone() is not None
+    cursor.close()
+    conn.close()
+    return existe
+
+# Insertar datos evitando duplicados
+def insertar_datos(tabla, id_station, datos):
+    conn = conectar_db()
+    cursor = conn.cursor()
+    query = f'''
+    INSERT IGNORE INTO {tabla} (id_station, date, dateutc, tempf, humidity, windspeedmph, windgustmph, maxdailygust, winddir,
+                                winddir_avg10m, hourlyrainin, eventrainin, dailyrainin, weeklyrainin, monthlyrainin, yearlyrainin,
+                                totalrainin, battout, tempinf, humidityin, baromrelin, baromabsin, feelsLike, dewPoint, feelsLikein, dewPointin, lastRain)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'''
+    
+    duplicados_consecutivos = 0  # Contador de registros duplicados seguidos
+    
+    for row in datos:
+        if registro_existe(tabla, id_station, row.get("dateutc", -9999)):
+            duplicados_consecutivos += 1
+            if duplicados_consecutivos >= 2:  # Si se encuentran 2 duplicados seguidos, se pasa a la siguiente estación
+                print(f"Se encontraron 2 registros duplicados seguidos en {tabla}, pasando a la siguiente estación...")
+                return True
+            continue  # Omitir la inserción si el registro ya existe
+
+        # Reiniciar el contador si encontramos un registro nuevo
+        duplicados_consecutivos = 0
+        
+        values = (
+            id_station,
+            row.get("date", None),
+            row.get("dateutc", -9999),
+            row.get("tempf", -9999),
+            row.get("humidity", -9999),
+            row.get("windspeedmph", -9999),
+            row.get("windgustmph", -9999),
+            row.get("maxdailygust", -9999),
+            row.get("winddir", -9999),
+            row.get("winddir_avg10m", -9999),
+            row.get("hourlyrainin", -9999),
+            row.get("eventrainin", -9999),
+            row.get("dailyrainin", -9999),
+            row.get("weeklyrainin", -9999),
+            row.get("monthlyrainin", -9999),
+            row.get("yearlyrainin", -9999),
+            row.get("totalrainin", -9999),
+            row.get("battout", -9999),
+            row.get("tempinf", -9999),
+            row.get("humidityin", -9999),        
+            row.get("baromrelin", -9999),
+            row.get("baromabsin", -9999),
+            row.get("feelsLike", -9999),
+            row.get("dewPoint", -9999),
+            row.get("feelsLikein", -9999),
+            row.get("dewPointin", -9999),
+            row.get("lastRain", None)
+        )
+        cursor.execute(query, values)
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return False
+
+# Descargar datos históricos
+def main():
+    macaddresses = obtener_macaddress()
+    fecha_actual = datetime.utcnow()
+    
+    for macaddress in macaddresses:
+        id_station = obtener_id_station(macaddress)
+        if id_station is None:
+            print(f"No se encontró id_station para {macaddress}")
+            continue
+        
+        fecha = fecha_actual
+        
+        while True:
+            fecha_str = fecha.strftime("%Y-%m-%dT23:59:59Z")
+            print(f"Obteniendo datos de {macaddress}")
+            url = BASE_URL.format(macaddress, API_KEY, APP_KEY, fecha_str)
+            response = requests.get(url)
+            
+            if response.status_code == 200:
+                datos = response.json()
+                if not datos:
+                    print(f"No hay mas registros para {macaddress} pasando a la siguiente dirección")
+                    break  # No hay más registros
+                
+                anio, mes = fecha.year, fecha.month
+                tabla = crear_tabla_si_no_existe(anio, mes)
+                
+                existe = insertar_datos(tabla, id_station, datos)
+                
+                if existe:
+                    break
             else:
-                print(f"No se encontró id_station para la macaddress: {mac_address}")
-                return None
-    finally:
-        conexion.close()
+                print(f"Error obteniendo datos para {macaddress} en {fecha_str}")
+            
+            fecha -= timedelta(days=1)  # Ir un día hacia atrás
+            time.sleep(1)  # Pausa para evitar sobrecargar la API
 
-# Función para crear una tabla si no existe
-def crear_tabla_mes_anio(mes, anio):
-    nombre_tabla = f"datos_{mes}_{anio}"
-    conexion = pymysql.connect(**config_db)
-    try:
-        with conexion.cursor() as cursor:
-            cursor.execute(f"""
-                CREATE TABLE IF NOT EXISTS {nombre_tabla} (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    id_station INT,
-                    fecha DATETIME,
-                    tempf FLOAT,
-                    feelsLike FLOAT,
-                    dewPoint FLOAT,
-                    windspeedmph FLOAT,
-                    windgustmph FLOAT,
-                    maxdailygust FLOAT,
-                    winddir FLOAT,
-                    hourlyrainin FLOAT,
-                    eventrainin FLOAT,
-                    dailyrainin FLOAT,
-                    weeklyrainin FLOAT,
-                    monthlyrainin FLOAT,
-                    yearlyrainin FLOAT,
-                    totalrainin FLOAT,
-                    baromrelin FLOAT,
-                    humidity FLOAT,
-                    tempinf FLOAT,
-                    humidityin FLOAT,
-                    winddir_avg10m FLOAT,
-                    battout FLOAT,
-                    baromabsin FLOAT,
-                    FOREIGN KEY (id_station) REFERENCES station(id_station)
-                )
-            """)
-        conexion.commit()
-    except pymysql.err.OperationalError as e:
-        print(f"Error al crear la tabla {nombre_tabla}: {e}")
-    finally:
-        conexion.close()
-    return nombre_tabla
-
-# Función para obtener datos de la API
-def obtener_datos_api(mac_address, end_date):
-    url = f"https://rt.ambientweather.net/v1/devices/{mac_address}"
-    params = {
-        "apiKey": api_key,
-        "applicationKey": application_key,
-        "endDate": end_date,
-        "limit": 288
-    }
-    respuesta = requests.get(url, params=params)
-    if respuesta.status_code == 200:
-        return respuesta.json()
-    else:
-        print(f"Error al obtener datos para {mac_address} en {end_date}: {respuesta.status_code}")
-        return None
-
-# Función para insertar datos en la base de datos
-def insertar_datos_en_db(nombre_tabla, datos):
-    conexion = pymysql.connect(**config_db)
-    try:
-        with conexion.cursor() as cursor:
-            query = f"""
-                INSERT INTO {nombre_tabla} (
-                    id_station, fecha, tempf, feelsLike, dewPoint, windspeedmph, windgustmph,
-                    maxdailygust, winddir, hourlyrainin, eventrainin, dailyrainin, weeklyrainin,
-                    monthlyrainin, yearlyrainin, totalrainin, baromrelin, humidity, tempinf,
-                    humidityin, winddir_avg10m, battout, baromabsin
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            cursor.executemany(query, datos)
-        conexion.commit()
-    finally:
-        conexion.close()
-
-# Función principal para obtener datos históricos
-def obtener_datos_historicos():
-    mac_addresses = leer_mac_addresses()  # Leer las direcciones MAC desde el archivo
-    fecha_actual = datetime.now(pytz.utc)  # Usamos UTC para coincidir con la API
-
-    while True:
-        for mac_address in mac_addresses:
-            # Obtener el id_station correspondiente a la mac_address
-            id_station = obtener_id_station(mac_address)
-            if id_station is None:
-                print(f"No se encontró id_station para {mac_address}. Saltando esta dirección MAC.")
-                continue
-
-            datos_del_dia = obtener_datos_api(mac_address, fecha_actual)
-            if datos_del_dia is None or len(datos_del_dia) == 0:
-                print(f"No hay más datos para {mac_address} en {fecha_actual}")
-                continue
-
-            # Procesar y almacenar los datos
-            datos_para_db = []
-            for fila in datos_del_dia:
-                try:
-                    # Verificar si dateutc es un timestamp (entero)
-                    if isinstance(fila["dateutc"], int):
-                        # Convertir el timestamp a datetime (asumiendo que está en milisegundos)
-                        fecha = datetime.fromtimestamp(fila["dateutc"] / 1000, tz=pytz.utc)
-                    else:
-                        # Si no es un entero, asumir que es una cadena y usar strptime
-                        fecha = datetime.strptime(fila["dateutc"], "%Y-%m-%dT%H:%M:%S.%fZ")
-                    
-                    # Definir los valores a insertar
-                    valores = (
-                        id_station,  # Usar el id_station obtenido
-                        fecha,
-                        fila.get("tempf", -9999),
-                        fila.get("feelsLike", -9999),
-                        fila.get("dewPoint", -9999),
-                        fila.get("windspeedmph", -9999),
-                        fila.get("windgustmph", -9999),
-                        fila.get("maxdailygust", -9999),
-                        fila.get("winddir", -9999),
-                        fila.get("hourlyrainin", -9999),
-                        fila.get("eventrainin", -9999),
-                        fila.get("dailyrainin", -9999),
-                        fila.get("weeklyrainin", -9999),
-                        fila.get("monthlyrainin", -9999),
-                        fila.get("yearlyrainin", -9999),
-                        fila.get("totalrainin", -9999),
-                        fila.get("baromrelin", -9999),
-                        fila.get("humidity", -9999),
-                        fila.get("tempinf", -9999),
-                        fila.get("humidityin", -9999),
-                        fila.get("winddir_avg10m", -9999),
-                        fila.get("battout", -9999),
-                        fila.get("baromabsin", -9999)
-                    )
-                    datos_para_db.append(valores)
-                except KeyError as e:
-                    print(f"Error: Falta la clave {e} en los datos de la API.")
-                except Exception as e:
-                    print(f"Error al procesar la fila: {e}")
-
-            # Crear la tabla si no existe
-            mes = fecha.strftime("%B").lower()
-            anio = fecha_actual.year
-            nombre_tabla = crear_tabla_mes_anio(mes, anio)
-
-            # Insertar los datos en la base de datos
-            insertar_datos_en_db(nombre_tabla, datos_para_db)
-            print(f"Datos insertados para {mac_address} en {fecha_actual}")
-
-        # Retroceder un día
-        fecha_actual -= timedelta(days=1)
-
-# Ejecutar el script
-if __name__ == "__main__":
-    obtener_datos_historicos()
+main()
