@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Mapa Meteorológico</title>
+    <!-- Incluye el CSS de Leaflet -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      crossorigin=""
+    />
+    <!-- Incluye el CSS personalizado -->
+    <link rel="stylesheet" href="styles.css" />
+    <!-- Incluye el script de Leaflet -->
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      crossorigin=""
+    ></script>
+  </head>
+  <body>
+    <header>
+      <nav>
+        <ul>
+          <li><a href="#map">Mapa Meteorológico</a></li>
+          <li><a href="#estadisticas">Estadísticas</a></li>
+          <li><a href="#graficas">Gráficas</a></li>
+          <li><a href="#antenas">Listado de Antenas</a></li>
+        </ul>
+      </nav>
+    </header>
+    <h1>Mapa Meteorológico</h1>
+    <div id="map"></div>
+    <script>
+      // Inicializa el mapa centrado en Chetumal, Quintana Roo
+      const map = L.map("map").setView([18.50012, -88.29614], 10);
+
+      // Añade el mapa base de OpenStreetMap
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution:
+          'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(map);
+
+      // Añade un marcador en Chetumal, Quintana Roo
+      const marker = L.marker([18.519640339524397, -88.30198419022742])
+        .addTo(map)
+        .bindPopup("Instituto Tecnológico de Chetumal")
+        .openPopup();
+    </script>
+  </body>
+</html>

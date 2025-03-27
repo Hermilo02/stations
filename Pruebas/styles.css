@@ -1,0 +1,60 @@
+/* Estilo general */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f9f9f9; /* Fondo blanco suave */
+  color: #333; /* Texto oscuro */
+}
+
+/* Estilo del encabezado y menú de navegación */
+header {
+  background-color: #005f99; /* Azul oscuro */
+  padding: 10px 0;
+}
+
+nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+}
+
+nav ul li {
+  margin: 0 15px;
+}
+
+nav ul li a {
+  text-decoration: none;
+  color: white; /* Texto blanco */
+  font-weight: bold;
+  padding: 10px 15px;
+  border-radius: 5px;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+nav ul li a:hover {
+  background-color: #ffa500; /* Naranja */
+  color: #005f99; /* Azul oscuro */
+}
+
+nav ul li a.active {
+  background-color: #ffa500; /* Naranja */
+  color: white; /* Texto blanco */
+}
+
+/* Estilo del contenedor del mapa */
+#map {
+  height: 500px; /* Altura del mapa */
+  width: 100%;   /* Ancho del mapa */
+  border: 1px solid #ccc; /* Opcional: borde para visualizar el contenedor */
+  margin-top: 20px;
+}
+
+/* Estilo del título */
+h1 {
+  text-align: center;
+  margin: 20px 0;
+  color: #005f99; /* Azul oscuro */
+}

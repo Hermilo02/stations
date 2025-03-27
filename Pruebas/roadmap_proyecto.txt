@@ -1,0 +1,115 @@
+========================================
+Este no es un documento final y puede ser cambiado dependiendo de la organizacion del equipo.
+Les recomiendo que le echen un ojo para hacer las prioridades.
+========================================
+
+========================================
+ROADMAP DEL PROYECTO: REDES METEOROLÓGICAS
+========================================
+
+1. **Conexión a la API y descarga de datos de cada estación**
+   - Configurar la conexión con la API de Ambient Weather.
+   - Descargar datos de las estaciones meteorológicas utilizando sus direcciones MAC.
+   - Optimizar la recolección de datos para reducir el tiempo de descarga.
+
+2. **Conexión a la estación de la escuela**
+   - Configurar la estación meteorológica del Instituto Tecnológico de Chetumal.
+   - Abrir la IP de la estación para su uso remoto.
+   - Leer el manual de la estación para entender su funcionamiento.
+
+3. **Base de datos NoSQL**
+   - Migrar la base de datos actual de MySQL a MongoDB.
+   - Aprender a trabajar con JSON y MongoDB para manejar grandes volúmenes de datos.
+
+4. **Optimización de recolección y descarga de datos**
+   - Reducir el tiempo de recolección de datos (actualmente 1 hora).
+   - Reducir el tiempo de descarga de datos (actualmente 1 semana).
+
+5. **Modelos matemáticos para datos más complejos**
+   - Implementar modelos para analizar datos como:
+     - Precipitación.
+     - Dirección del viento.
+     - Pronósticos meteorológicos.
+
+6. **Visualización de los datos**
+   - Crear gráficas interactivas para representar los datos meteorológicos.
+   - Implementar mapas interactivos para visualizar las estaciones y sus datos.
+
+========================================
+CONVERSACIONES ANTERIORES
+========================================
+
+1. **Migración a MongoDB**
+   - Se propuso usar MongoDB como base de datos NoSQL para manejar grandes volúmenes de datos.
+   - Ejemplo de estructura JSON para almacenar datos meteorológicos:
+     ```json
+     {
+       "station_id": "12345",
+       "mac_address": "00:1A:2B:3C:4D:5E",
+       "location": {
+         "latitude": 19.432608,
+         "longitude": -99.133209
+       },
+       "data": [
+         {
+           "timestamp": "2025-03-24T12:00:00Z",
+           "temperature": 25.3,
+           "humidity": 60,
+           "wind_speed": 5.2
+         }
+       ]
+     }
+     ```
+
+2. **Visualización con OpenStreetMap**
+   - Se implementó un mapa interactivo utilizando Leaflet.js y OpenStreetMap.
+   - Código para centrar el mapa en Chetumal, Quintana Roo:
+     ```javascript
+     const map = L.map("map").setView([18.50012, -88.29614], 10);
+     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+       maxZoom: 19,
+       attribution: 'Map data © OpenStreetMap contributors',
+     }).addTo(map);
+     ```
+
+3. **Menú de navegación**
+   - Se creó un menú de navegación horizontal con las siguientes secciones:
+     - Mapa Meteorológico.
+     - Estadísticas.
+     - Gráficas.
+     - Listado de Antenas.
+   - Estilo del menú con colores azul, naranja y blanco:
+     ```css
+     nav ul li a:hover {
+       background-color: #ffa500; /* Naranja */
+       color: #005f99; /* Azul oscuro */
+     }
+     ```
+
+4. **Errores resueltos**
+   - Problema con el atributo `integrity` en los recursos de Leaflet.js y Leaflet.css.
+   - Solución: eliminar el atributo `integrity` para evitar bloqueos en la carga de recursos.
+
+========================================
+TAREAS PENDIENTES
+========================================
+
+1. **Conexión a MongoDB**
+   - Migrar los datos actuales de MySQL a MongoDB.
+   - Crear un script para importar datos históricos.
+
+2. **Optimización de la API**
+   - Reducir el tiempo de recolección y descarga de datos.
+   - Configurar un servicio de ingesta en tiempo real.
+
+3. **Visualización avanzada**
+   - Añadir gráficas interactivas con bibliotecas como Chart.js o Plotly.
+   - Implementar capas adicionales en el mapa (por ejemplo, datos de precipitación).
+
+4. **Documentación**
+   - Documentar el proyecto y las configuraciones realizadas.
+   - Crear manuales para el uso de la API y la base de datos.
+
+========================================
+FIN DEL DOCUMENTO
+========================================
